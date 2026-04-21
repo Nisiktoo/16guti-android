@@ -18,6 +18,6 @@ data class PieceId(val value: Int)
 data class Piece(
     val id: PieceId,
     val owner: Player,
-    val position: BoardNodeId,
+    val position: BoardNodeId?,
     val isAlive: Boolean = true
 )
