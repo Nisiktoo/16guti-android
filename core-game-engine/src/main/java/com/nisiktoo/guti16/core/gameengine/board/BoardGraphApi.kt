@@ -3,6 +3,7 @@ package com.nisiktoo.guti16.core.gameengine.board
 import com.nisiktoo.guti16.core.gameengine.model.BoardNode
 import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
 import java.util.ArrayDeque
+import javax.sound.midi.MidiEvent
 import kotlin.math.abs
 
 /**
@@ -16,9 +17,119 @@ object BoardGraphApi {
     private val nodes: Map<BoardNodeId, BoardNode>
         get() = BoardGraph.nodes
 
-    // -----------------------------
-    // Basic graph access
-    // -----------------------------
+    /** Cached set of all node IDs for quick validation and iteration. */
+    private val nodeIds: Set<Int> by lazy {
+        nodes.keys.map { it.value }.toSet()
+    }
+
+    /** Cached maximum node ID + 1 for efficient matrix indexing. */
+    private val matrixSize: Int by lazy {
+        (nodes.keys.maxOfOrNull { it.value } ?: 0) + 1
+    }
+
+    /** Cached adjacency matrix for O(1) edge existence checks. */
+    private val adjacencyMatrix: Array<BooleanArray> by lazy {
+        Array(matrixSize) { BooleanArray(matrixSize) }
+            .also { matrix ->
+                for (node in nodes.values) {
+                    for (neighbor in node.neighbors) {
+                        matrix[node.id.value][neighbor.value] = true
+                    }
+                }
+            }
+    }
+
+    /** Represents a valid capture path consisting of a source node, a middle node (the captured piece), and a target node.
+     * @param source the starting node of the move.
+     * @param middle the node representing the piece being captured.
+     * @param target the destination node of the move after the capture.
+     */
+
+    data class CapturePath(
+        val source: BoardNodeId,
+        val middle: BoardNodeId,
+        val target: BoardNodeId,
+    )
+
+    /** Cached matrix mapping pairs of nodes to the middle node for valid captures, or -1 if no capture is possible. */
+    private val middleNodeMatrix: Array<IntArray> by lazy {
+        Array(matrixSize) { IntArray(matrixSize) { -1 } }.also { matrix ->
+            buildMiddleNodeMatrix(matrix)
+        }
+    }
+
+    /** Cached list of valid capture targets for each source node, used for efficient move generation. */
+    private val nodeCapturePathsOf: Array<MutableList<Int>> by lazy {
+        Array(matrixSize) { mutableListOf() }
+    }
+
+    /** Retrieves the middle node ID for a valid capture move from [source] to [target], or null if no capture is possible.
+     *
+     * @param source the starting node of the move.
+     * @param target the destination node of the move after the capture.
+     * @return the middle node ID representing the captured piece, or null if no capture is possible.
+     * @throws IllegalArgumentException if either [source] or [target] is not a valid node ID.
+     */
+    private fun buildMiddleNodeMatrix(matrix: Array<IntArray>) {
+        fun register(source: BoardNodeId, middle: BoardNodeId, target: BoardNodeId) {
+            matrix[source.value][target.value] = middle.value
+            nodeCapturePathsOf[source.value].add(target.value)
+        }
+
+        // 1) mirrored graph-based capture paths
+        for (source in nodes.values) {
+            for (middleId in source.neighbors) {
+                val middle = nodes[middleId] ?: continue
+                val target = nodes.values.firstOrNull {
+                    it.row == middle.row + (middle.row - source.row) &&
+                            it.col == middle.col + (middle.col - source.col)
+                } ?: continue
+
+                if (isAdjacent(source.id, middle.id) && isAdjacent(middle.id, target.id)) {
+                    register(source.id, middle.id, target.id)
+                }
+            }
+        }
+
+        fun registerSpecial(sr: Int, sc: Int, mr: Int, mc: Int, tr: Int, tc: Int) {
+            val s = nodes.values.firstOrNull { it.row == sr && it.col == sc }?.id ?: return
+            val m = nodes.values.firstOrNull { it.row == mr && it.col == mc }?.id ?: return
+            val t = nodes.values.firstOrNull { it.row == tr && it.col == tc }?.id ?: return
+            register(s, m, t)
+        }
+
+        registerSpecial(0, 1, 1, 1, 2, 2)
+        registerSpecial(0, 3, 1, 3, 2, 2)
+        registerSpecial(2, 2, 1, 1, 0, 1)
+        registerSpecial(2, 2, 1, 3, 0, 3)
+        registerSpecial(8, 1, 7, 1, 6, 2)
+        registerSpecial(6, 2, 7, 1, 8, 1)
+        registerSpecial(8, 3, 7, 3, 6, 2)
+        registerSpecial(6, 2, 7, 3, 8, 3)
+    }
+
+    /** Validates that [id] is a known node in the board graph.
+     *
+     * @param id the node identifier to check.
+     * @return `true` if [id] exists in the board graph, `false` otherwise.
+     */
+    private fun isValidNodeId(id: BoardNodeId): Boolean = id.value in nodeIds
+
+
+    /** Checks whether [to] is directly adjacent to [from] in the board graph.
+     *
+     * @param from the source node id.
+     * @param to the target node id.
+     * @return `true` if [to] is a direct neighbor of [from], `false` otherwise.
+     * @throws IllegalArgumentException if either [from] or [to] is not a valid node ID.
+     */
+    fun isAdjacent(from: BoardNodeId, to: BoardNodeId): Boolean {
+        if (!isValidNodeId(from) || !isValidNodeId(to)) {
+            throw IllegalArgumentException("Invalid node ID: from=${from.value}, to=${to.value}")
+        }
+        return adjacencyMatrix[from.value][to.value]
+    }
+
 
     /**
      * Returns the board node for [id].
@@ -37,202 +148,35 @@ object BoardGraphApi {
      * @return immutable list of adjacent node ids in board order.
      * @throws IllegalStateException if [id] is not part of the board.
      */
-    fun neighborsOf(id: BoardNodeId): List<BoardNodeId> =
-        getNode(id).neighbors
+    fun neighborsOf(id: BoardNodeId): List<BoardNodeId> = getNode(id).neighbors
 
-    /**
-     * Checks whether [to] is a legal direct neighbor of [from].
+    /** Checks if a valid capture move exists from [from] to [to] by verifying the presence of a middle node.
      *
      * @param from the source node id.
      * @param to the target node id.
-     * @return `true` when [to] is reachable in one step from [from].
+     * @return `true` if a valid capture move exists (i.e., there is a middle node between [from] and [to]), `false` otherwise.
+     * @throws IllegalArgumentException if either [from] or [to] is not a valid node ID.
      */
-    fun isAdjacent(from: BoardNodeId, to: BoardNodeId): Boolean =
-        to in neighborsOf(from)
-
-    /**
-     * Returns the number of direct neighbors for [id].
-     *
-     * @param id the node to inspect.
-     * @return count of one-step moves available from [id].
-     */
-    fun degree(id: BoardNodeId): Int =
-        neighborsOf(id).size
-
-    // -----------------------------
-    // Move classification layer
-    // -----------------------------
-
-    enum class MoveType {
-        STEP,
-        JUMP,
-        INVALID
-    }
-
-    /**
-     * Classifies a move by board topology only.
-     *
-     * @param from the source node id.
-     * @param to the target node id.
-     * @return [MoveType.STEP] for direct adjacency, [MoveType.JUMP] for a valid
-     * two-node jump line, otherwise [MoveType.INVALID].
-     */
-    fun classifyMove(from: BoardNodeId, to: BoardNodeId): MoveType {
-        if (from == to) return MoveType.INVALID
-
-        if (isAdjacent(from, to)) {
-            return MoveType.STEP
+    fun isCaptureAdjacent(from: BoardNodeId, to: BoardNodeId): Boolean {
+        if (!isValidNodeId(from) || !isValidNodeId(to)) {
+            throw IllegalArgumentException("Invalid node ID: from=${from.value}, to=${to.value}")
         }
-
-        if (middleNode(from, to) != null) {
-            return MoveType.JUMP
-        }
-
-        return MoveType.INVALID
+        return middleNodeMatrix[from.value][to.value] != -1
     }
 
-    /**
-     * Checks whether a move is valid by board topology alone.
+    /** Retrieves the middle node ID for a valid capture move from [from] to [to], or null if no capture is possible.
      *
      * @param from the source node id.
      * @param to the target node id.
-     * @return `true` when the move is either a step or a jump.
+     * @return the middle node ID representing the captured piece, or null if no capture is possible.
+     * @throws IllegalArgumentException if either [from] or [to] is not a valid node ID.
      */
-    fun isValidMove(from: BoardNodeId, to: BoardNodeId): Boolean =
-        classifyMove(from, to) != MoveType.INVALID
-
-    /**
-     * Checks whether [to] is a legal one-step move from [from].
-     *
-     * @param from the source node id.
-     * @param to the target node id.
-     * @return `true` when [to] is directly adjacent to [from].
-     */
-    fun canStepMove(from: BoardNodeId, to: BoardNodeId): Boolean =
-        classifyMove(from, to) == MoveType.STEP
-
-    /**
-     * Checks whether [to] is a legal jump landing point from [from].
-     *
-     * @param from the source node id.
-     * @param to the landing node id.
-     * @return `true` when [to] is two board units away and a valid middle node exists.
-     */
-    fun isValidJump(from: BoardNodeId, to: BoardNodeId): Boolean =
-        classifyMove(from, to) == MoveType.JUMP
-
-    /**
-     * Returns the middle node for a valid jump line from [from] to [to].
-     *
-     * @param from the source node id.
-     * @param to the destination node id.
-     * @return the unique middle node id, or `null` if the pair is not a valid jump line.
-     */
-    fun middleNode(from: BoardNodeId, to: BoardNodeId): BoardNodeId? =
-        resolveMiddleNode(from, to)
-
-    // -----------------------------
-    // Jump logic (internal core)
-    // -----------------------------
-
-    private fun resolveMiddleNode(from: BoardNodeId, to: BoardNodeId): BoardNodeId? {
-        val a = nodeAt(from) ?: return null
-        val b = nodeAt(to) ?: return null
-
-        val dr = b.row - a.row
-        val dc = b.col - a.col
-
-        val isTwoStepLine =
-            (dr == 0 && abs(dc) == 2) ||
-                    (dc == 0 && abs(dr) == 2) ||
-                    (abs(dr) == 2 && abs(dc) == 2)
-
-        if (!isTwoStepLine) return null
-
-        val midRow = a.row + dr / 2
-        val midCol = a.col + dc / 2
-
-        val mid = nodeAt(midRow, midCol) ?: return null
-
-        return if (isAdjacent(from, mid.id) && isAdjacent(mid.id, to)) {
-            mid.id
-        } else null
-    }
-
-    /**
-     * Returns the jump landing node after crossing [middle] from [from].
-     *
-     * @param from the source node id.
-     * @param middle the intermediate node being jumped over.
-     * @return the landing node id, or `null` if the jump line is invalid.
-     */
-    fun getJumpTarget(from: BoardNodeId, middle: BoardNodeId): BoardNodeId? {
-        val a = nodeAt(from) ?: return null
-        val m = nodeAt(middle) ?: return null
-
-        val dr = m.row - a.row
-        val dc = m.col - a.col
-
-        val targetRow = m.row + dr
-        val targetCol = m.col + dc
-
-        val target = nodeAt(targetRow, targetCol) ?: return null
-
-        return if (isAdjacent(from, middle) && isAdjacent(middle, target.id)) {
-            target.id
-        } else null
-    }
-
-    // -----------------------------
-    // Reachability (BFS)
-    // -----------------------------
-
-    /**
-     * Checks whether [to] can be reached from [from] by repeatedly taking legal steps.
-     *
-     * @param from the source node id.
-     * @param to the destination node id.
-     * @return `true` if a path exists using one-step edges only.
-     */
-    fun canReach(from: BoardNodeId, to: BoardNodeId): Boolean {
-        if (from == to) return true
-
-        val visited = mutableSetOf(from)
-        val queue = ArrayDeque<BoardNodeId>()
-        queue.add(from)
-
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-
-            for (n in neighborsOf(current)) {
-                if (!visited.add(n)) continue
-                if (n == to) return true
-                queue.add(n)
-            }
+    fun getCaptureMiddleNode(from: BoardNodeId, to: BoardNodeId): BoardNodeId? {
+        if (!isValidNodeId(from) || !isValidNodeId(to)) {
+            throw IllegalArgumentException("Invalid node ID: from=${from.value}, to=${to.value}")
         }
-
-        return false
+        val middleValue = middleNodeMatrix[from.value][to.value]
+        return if (middleValue != -1) BoardNodeId(middleValue) else null
     }
 
-    // -----------------------------
-    // Debug utilities
-    // -----------------------------
-
-    /**
-     * Produces a deterministic, line-based dump of the graph.
-     *
-     * @return multi-line text containing each node id, board coordinate, and adjacency list.
-     */
-    fun dumpGraph(): String =
-        nodes.values
-            .sortedBy { it.id.value }
-            .joinToString("\n") { node ->
-                val ns = node.neighbors.joinToString(",") { it.value.toString() }
-                "${node.id.value}(${node.row},${node.col}) -> [$ns]"
-            }
-
-    private fun nodeAt(id: BoardNodeId): BoardNode? = nodes[id]
-
-    private fun nodeAt(row: Int, col: Int): BoardNode? =
-        nodes.values.firstOrNull { it.row == row && it.col == col }
 }

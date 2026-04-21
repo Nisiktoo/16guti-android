@@ -1,8 +1,4 @@
 package com.nisiktoo.guti16.core.gameengine.model
-enum class Player {
-    A,
-    B
-}
 
 data class PieceId(val value: Int)
 
