@@ -19,17 +19,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.nisiktoo.guti16.core.gameengine.board.BoardGraphApi
+import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
 import com.nisiktoo.guti16.featuregame.components.BoardCanvas
 
 @Composable
-fun GameScreen(modifier: Modifier = Modifier) {
+fun GameScreen(modifier: Modifier = Modifier.fillMaxSize()) {
     val viewModel = remember { GameViewModel() }
     val uiState = viewModel.uiState
-
     Column (
         modifier = Modifier.padding(16.dp)
     ){
-        BoardCanvas(modifier = modifier, pieces = uiState.pieces)
+        BoardCanvas(pieces = uiState.pieces,
+            onNodeClick = { nodeId ->
+                viewModel.onEvent(GameEvent.BoardNodeTapped(BoardNodeId(nodeId)))
+            },
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

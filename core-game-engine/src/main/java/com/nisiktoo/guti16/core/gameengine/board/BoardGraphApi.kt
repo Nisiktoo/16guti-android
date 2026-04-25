@@ -178,10 +178,10 @@ object BoardGraphApi {
         val middleValue = middleNodeMatrix[from.value][to.value]
         return if (middleValue != -1) BoardNodeId(middleValue) else null
     }
-    /** Get all the board nodes as a list. The order of nodes is not guaranteed and should not be relied upon.
-     *
-     * @return a list of all [BoardNode]s in the board graph.
-     */
+    /** Get all the board nodes as a list of BoardNode. The order of nodes is not guaranteed and should not be relied upon. */
     fun getAllBoardNodes(): List<BoardNode> = nodes.values.toList()
+
+    /** Get all the board node ids as a list of Integer. The order of nodes is not guaranteed and should not be relied upon.*/
+    fun getAllBoardNodeIds(): List<Int> = nodeIds.toList()
 
 }

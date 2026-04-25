@@ -1,19 +1,38 @@
 package com.nisiktoo.guti16.featuregame.presentation
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
+import com.nisiktoo.guti16.core.gameengine.model.Player
 import com.nisiktoo.guti16.core.gameengine.state.GameState
 import com.nisiktoo.guti16.coredomain.model.GameSession
 import com.nisiktoo.guti16.coredomain.model.PlayerAppearance
 import com.nisiktoo.guti16.coredomain.usecase.CreateGameSessionUseCase
-
+import com.nisiktoo.guti16.featuregame.presentation.GameEvent.BoardNodeTapped
 /**
  * ViewModel for the game screen, managing the game state and handling user interactions.
  */
 class GameViewModel : ViewModel() {
-    private val createGameSessionUseCase = CreateGameSessionUseCase()
-    private val gameSession = createGameSessionUseCase()
+    fun onEvent(event: GameEvent) {
+        when(event) {
+            is GameEvent.BoardNodeTapped -> {
+                /* To Do */
+            }
+            GameEvent.ResetGame -> {
+                /* To Do */
+            }
+            GameEvent.UndoMove -> {
+                /* To Do */
+            }
+        }
+    }
 
-    val uiState: GameUiState = gameSession.toUiState()
+    private val createGameSessionUseCase = CreateGameSessionUseCase()
+
+    private var gameSession = createGameSessionUseCase()
+
+    var uiState by mutableStateOf(gameSession.toUiState())
 }
 
 private fun GameSession.toUiState(): GameUiState {
@@ -25,7 +44,7 @@ private fun GameSession.toUiState(): GameUiState {
     return gameState.toUiState(styleByPlayer)
 }
 
-private fun GameState.toUiState(styleByPlayer: Map<com.nisiktoo.guti16.core.gameengine.model.Player, PlayerAppearance>): GameUiState {
+private fun GameState.toUiState(styleByPlayer: Map<Player, PlayerAppearance>): GameUiState {
     return GameUiState(
         pieces = pieces.map { piece ->
             val style = requireNotNull(styleByPlayer[piece.owner]) {

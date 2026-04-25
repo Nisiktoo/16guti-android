@@ -1,15 +1,28 @@
 package com.nisiktoo.guti16.featuregame.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nisiktoo.guti16.core.gameengine.board.BoardGraphApi
+import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
 import com.nisiktoo.guti16.coreui.theme.PieceTheme
 import com.nisiktoo.guti16.featuregame.presentation.PieceUi
 import kotlin.math.min
@@ -22,9 +35,39 @@ import kotlin.math.min
 fun BoardCanvas(
     modifier: Modifier = Modifier,
     pieces: List<PieceUi> = emptyList(),
+    boardNodeIds: List<Int> = BoardGraphApi.getAllBoardNodeIds(),
+    onNodeClick: (Int) -> Unit = {},
 ) {
-    Canvas(modifier = modifier.fillMaxSize()) {
-        drawBoard(pieces)
+    val currentOnNodeClick by rememberUpdatedState(onNodeClick)
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    var boardLayout by remember(boardNodeIds) {
+        mutableStateOf<BoardLayout?>(null)
+    }
+
+    LaunchedEffect(canvasSize, boardNodeIds) {
+        if (canvasSize.width > 0 && canvasSize.height > 0) {
+            boardLayout = buildBoardLayout(
+                canvasWidth = canvasSize.width.toFloat(),
+                canvasHeight = canvasSize.height.toFloat(),
+                boardNodeIds = boardNodeIds,
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier.fillMaxSize().onSizeChanged{ canvasSize = it}
+    ) {
+        Canvas(modifier = Modifier
+            .matchParentSize()
+            .pointerInput(boardLayout) {
+                detectTapGestures {  tap ->
+                    boardLayout?.hitTest(tap)?.let(currentOnNodeClick)
+                }
+            }
+        ) {
+            val layout = boardLayout ?: return@Canvas
+            drawBoard(layout, pieces)
+        }
     }
 }
 
@@ -32,9 +75,9 @@ fun BoardCanvas(
  *drawBoard actually draws the board background.
 
  */
-fun DrawScope.drawBoard(pieces: List<PieceUi> = emptyList()) {
-    drawBoardLines()
-    drawPieces(pieces)
+private fun DrawScope.drawBoard(layout: BoardLayout, pieces: List<PieceUi> = emptyList()) {
+    drawBoardLines(layout)
+    drawPieces(layout, pieces)
 }
 /** BoardPoint represents a point on the board.
  * BoardPoint is used to translate the coordinate of the board to the coordinate of the canvas.
@@ -48,6 +91,97 @@ private data class BoardPoint(val rowUnit: Float, val colUnit: Float)
  * @param end: BoardPoint -- the end point of the line
  */
 private data class BoardLine(val start: BoardPoint, val end: BoardPoint)
+
+
+/** NodeHitRegion represents a region on the board where a node can be hit.
+ * @param nodeId: Int -- the id of the node
+ * @param center: Offset -- the center of the region
+ * @param radius: Float -- the radius of the region
+ */
+private data class NodeHitRegion(
+    val nodeId: Int,
+    val center: Offset,
+    val radius: Float,
+)
+
+/** BoardLayout represents the layout of the board.
+ * @param originX: Float -- the x coordinate of the origin of the board
+ * @param originY: Float -- the y coordinate of the origin of the board
+ * @param unit: Float -- the unit of the board
+ * @param nodeCenters: Map<Int, Offset> -- the center of each node
+ * @param hitRegions: List<NodeHitRegion> -- the hit regions of each node
+ */
+private data class BoardLayout(
+    val originX: Float,
+    val originY: Float,
+    val unit: Float,
+    val nodeCenters: Map<Int, Offset>,
+    val hitRegions : List<NodeHitRegion>,
+) {
+
+    /** hitTest returns the id of the node that was hit, or null if no node was hit.
+     * @param tap: Offset -- the tap point
+     * @return Int? -- the id of the node that was hit, or null if no node was hit
+     */
+    fun hitTest(tap: Offset): Int? {
+        var bestNodeId: Int? = null
+        var bestDistSq = Float.MAX_VALUE
+
+        for (region in hitRegions) {
+            val dx = tap.x - region.center.x
+            val dy = tap.y - region.center.y
+            val distSq = dx * dx + dy * dy
+            val radiusSq = region.radius * region.radius
+            if (distSq <= radiusSq && distSq < bestDistSq) {
+                bestDistSq = distSq
+                bestNodeId = region.nodeId
+            }
+        }
+        return bestNodeId
+    }
+    fun centerOf(nodeId: Int) : Offset? = nodeCenters[nodeId]
+}
+
+private fun buildBoardLayout(
+    canvasWidth: Float,
+    canvasHeight: Float,
+    boardNodeIds: List<Int>,
+): BoardLayout {
+    val unit = min(canvasWidth / 4f, canvasHeight / 6f)
+    val boardWidth = 4f * unit
+    val boardHeight = 6f * unit
+
+    val originX = (canvasWidth - boardWidth) / 2f
+    val originY = (canvasHeight - boardHeight) / 2f
+
+    val pieceRadius = PieceTheme().pieceRadius
+    val hitRadius = maxOf(pieceRadius * 1.35f, unit * 0.28f)
+    val nodeCenters = LinkedHashMap<Int, Offset>(boardNodeIds.size)
+    val hitRegions = ArrayList<NodeHitRegion>(boardNodeIds.size)
+
+    for (nodeId in boardNodeIds) {
+        val node = BoardGraphApi.getNode(BoardNodeId(nodeId))
+        val center = boardPointToOffset(
+            boardPoint = boardPoint(row = node.row, col = node.col),
+            originX = originX,
+            originY = originY,
+            unit = unit,
+        )
+        nodeCenters[nodeId] = center
+        hitRegions += NodeHitRegion(
+            nodeId = nodeId,
+            center = center,
+            radius = hitRadius,
+        )
+    }
+    return BoardLayout(
+        originX = originX,
+        originY = originY,
+        unit = unit,
+        nodeCenters = nodeCenters,
+        hitRegions = hitRegions,
+    )
+}
 
 /** Get the exact location of a point on the board given its matrix coordinate.
  * It translates the coordinate of the board to the coordinate of the canvas.
@@ -151,48 +285,40 @@ private fun buildBoardLines(): List<BoardLine> {
     return lines
 }
 
-fun DrawScope.drawBoardLines() {
-    val unit = min(size.width / 4f, size.height / 6f)
-    val boardWidth = 4f * unit
-    val boardHeight = 6f * unit
 
-    val originX = (size.width - boardWidth) / 2f
-    val originY = (size.height - boardHeight) / 2f
+/** drawBoardLines draws the board lines on the canvas.
+ * @param layout: BoardLayout -- the layout of the board
+ */
+private fun DrawScope.drawBoardLines(layout: BoardLayout) {
     val strokeWidth = (size.minDimension * 0.004f).coerceAtLeast(2f)
-
     val boardColor = Color(0xFF3D91A0)
+
     buildBoardLines().forEach { line ->
         drawLine(
             color = boardColor,
-            start = boardPointToOffset(line.start, originX, originY, unit),
-            end = boardPointToOffset(line.end, originX, originY, unit),
-            strokeWidth = strokeWidth
+            start = boardPointToOffset(line.start, layout.originX, layout.originY, layout.unit),
+            end = boardPointToOffset(line.end, layout.originX, layout.originY, layout.unit),
+            strokeWidth = strokeWidth,
         )
     }
 }
 
-/** * Draws the pieces on the board based on their current state.
- * Each piece is drawn as a circle with its corresponding color and position.
- * Only alive pieces with valid positions are rendered.
- *
- * @param pieces List of PieceUi objects representing the current pieces in the game.
+
+
+/** drawPieces draws the pieces on the board.
+ * @param layout: BoardLayout -- the layout of the board
+ * @param pieces: List<PieceUi> -- the list of pieces to draw
  */
-private fun DrawScope.drawPieces(pieces: List<PieceUi>) {
+private fun DrawScope.drawPieces(layout: BoardLayout, pieces: List<PieceUi>) {
     if (pieces.isEmpty()) return
 
-    val unit = min(size.width / 4f, size.height / 6f)
-    val boardWidth = 4f * unit
-    val boardHeight = 6f * unit
-    val originX = (size.width - boardWidth) / 2f
-    val originY = (size.height - boardHeight) / 2f
     val pieceRadius = PieceTheme().pieceRadius
 
     pieces
         .asSequence()
         .filter { it.isAlive && it.position != null }
         .forEach { piece ->
-            val node = BoardGraphApi.getNode(piece.position!!)
-            val center = boardPointToOffset(boardPoint(node.row, node.col), originX, originY, unit)
+            val center = layout.centerOf(piece.position?.value!!) ?: return@forEach
 
             drawCircle(
                 color = piece.pieceColor,
@@ -208,7 +334,9 @@ private fun DrawScope.drawPieces(pieces: List<PieceUi>) {
                 color = piece.borderColor,
                 radius = pieceRadius,
                 center = center,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = (pieceRadius * 0.12f).coerceAtLeast(1.5f)),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = (pieceRadius * 0.12f).coerceAtLeast(1.5f)
+                ),
             )
         }
 }

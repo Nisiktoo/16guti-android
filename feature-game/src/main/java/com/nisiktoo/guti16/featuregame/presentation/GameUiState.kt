@@ -22,6 +22,7 @@ data class GameUiState(
     val pieces: List<PieceUi> = emptyList(),
     val currentPlayer: Player = Player.A,
     val selectedPieceId: PieceId? = null,
+    val selectedNodeID: BoardNodeId? = null,
     val gamePhase: GamePhase = GamePhase.NORMAL,
     val winner: Player? = null,
     val lastMove: MoveUi? = null,
