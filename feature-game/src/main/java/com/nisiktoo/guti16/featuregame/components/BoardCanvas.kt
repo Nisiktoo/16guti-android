@@ -1,7 +1,6 @@
 package com.nisiktoo.guti16.featuregame.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -10,6 +9,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
+import com.nisiktoo.guti16.core.gameengine.board.BoardGraphApi
+import com.nisiktoo.guti16.coreui.theme.PieceTheme
+import com.nisiktoo.guti16.featuregame.presentation.PieceUi
 import kotlin.math.min
 
 /**
@@ -17,9 +19,12 @@ import kotlin.math.min
 
  */
 @Composable
-fun BoardCanvas(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.fillMaxSize().padding(5.dp)) {
-        drawBoard()
+fun BoardCanvas(
+    modifier: Modifier = Modifier,
+    pieces: List<PieceUi> = emptyList(),
+) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawBoard(pieces)
     }
 }
 
@@ -27,8 +32,9 @@ fun BoardCanvas(modifier: Modifier = Modifier) {
  *drawBoard actually draws the board background.
 
  */
-fun DrawScope.drawBoard() {
+fun DrawScope.drawBoard(pieces: List<PieceUi> = emptyList()) {
     drawBoardLines()
+    drawPieces(pieces)
 }
 /** BoardPoint represents a point on the board.
  * BoardPoint is used to translate the coordinate of the board to the coordinate of the canvas.
@@ -77,6 +83,16 @@ private fun boardPoint(row: Int, col: Int): BoardPoint {
 
     return BoardPoint(rowUnit = rowUnit, colUnit = colUnit)
 }
+
+private fun boardPointToOffset(
+    boardPoint: BoardPoint,
+    originX: Float,
+    originY: Float,
+    unit: Float,
+): Offset = Offset(
+    x = originX + (boardPoint.colUnit * unit),
+    y = originY + (boardPoint.rowUnit * unit),
+)
 
 
 /**
@@ -144,18 +160,55 @@ fun DrawScope.drawBoardLines() {
     val originY = (size.height - boardHeight) / 2f
     val strokeWidth = (size.minDimension * 0.004f).coerceAtLeast(2f)
 
-    fun BoardPoint.toOffset(): Offset = Offset(
-        x = originX + (colUnit * unit),
-        y = originY + (rowUnit * unit)
-    )
-
     val boardColor = Color(0xFF3D91A0)
     buildBoardLines().forEach { line ->
         drawLine(
             color = boardColor,
-            start = line.start.toOffset(),
-            end = line.end.toOffset(),
+            start = boardPointToOffset(line.start, originX, originY, unit),
+            end = boardPointToOffset(line.end, originX, originY, unit),
             strokeWidth = strokeWidth
         )
     }
+}
+
+/** * Draws the pieces on the board based on their current state.
+ * Each piece is drawn as a circle with its corresponding color and position.
+ * Only alive pieces with valid positions are rendered.
+ *
+ * @param pieces List of PieceUi objects representing the current pieces in the game.
+ */
+private fun DrawScope.drawPieces(pieces: List<PieceUi>) {
+    if (pieces.isEmpty()) return
+
+    val unit = min(size.width / 4f, size.height / 6f)
+    val boardWidth = 4f * unit
+    val boardHeight = 6f * unit
+    val originX = (size.width - boardWidth) / 2f
+    val originY = (size.height - boardHeight) / 2f
+    val pieceRadius = PieceTheme().pieceRadius
+
+    pieces
+        .asSequence()
+        .filter { it.isAlive && it.position != null }
+        .forEach { piece ->
+            val node = BoardGraphApi.getNode(piece.position!!)
+            val center = boardPointToOffset(boardPoint(node.row, node.col), originX, originY, unit)
+
+            drawCircle(
+                color = piece.pieceColor,
+                radius = pieceRadius,
+                center = center,
+            )
+            drawCircle(
+                color = piece.selectedGlowColor.copy(alpha = 0.22f),
+                radius = pieceRadius * 0.82f,
+                center = center,
+            )
+            drawCircle(
+                color = piece.borderColor,
+                radius = pieceRadius,
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = (pieceRadius * 0.12f).coerceAtLeast(1.5f)),
+            )
+        }
 }

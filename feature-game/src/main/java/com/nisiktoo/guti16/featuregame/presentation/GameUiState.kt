@@ -6,6 +6,7 @@ import com.nisiktoo.guti16.core.gameengine.model.GamePhase
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
 import com.nisiktoo.guti16.core.gameengine.state.GameState
 import com.nisiktoo.guti16.core.gameengine.model.Player
+import androidx.compose.ui.graphics.Color
 
 /**
  * Represents the UI state of the game, including the list of pieces, current player, selected piece, game phase, winner, last move, and any error messages.
@@ -39,6 +40,9 @@ data class PieceUi(
     val owner: Player,
     val position: BoardNodeId?,
     val isAlive: Boolean = true,
+    val pieceColor: Color,
+    val borderColor: Color,
+    val selectedGlowColor: Color,
 )
 
 /**
