@@ -1,34 +1,24 @@
 package com.nisiktoo.guti16.featuregame.presentation
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.nisiktoo.guti16.core.gameengine.board.BoardGraphApi
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
 import com.nisiktoo.guti16.featuregame.components.BoardCanvas
 
 @Composable
-fun GameScreen(modifier: Modifier = Modifier.fillMaxSize()) {
-    val viewModel = remember { GameViewModel() }
+fun GameScreen(
+    modifier: Modifier = Modifier.fillMaxSize(),
+    viewModel: GameViewModel = viewModel()
+) {
     val uiState = viewModel.uiState
     Column (
-        modifier = Modifier.padding(16.dp)
+        modifier = modifier.padding(16.dp)
     ){
         BoardCanvas(pieces = uiState.pieces,
             onNodeClick = { nodeId ->

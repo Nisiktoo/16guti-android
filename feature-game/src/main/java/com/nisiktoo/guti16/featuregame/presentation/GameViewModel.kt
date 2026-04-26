@@ -43,9 +43,6 @@ class GameViewModel : ViewModel() {
             GameEvent.UndoMove -> {
                 /* To Do */
             }
-            else -> {
-                println("An event with no care")
-            }
         }
     }
 
