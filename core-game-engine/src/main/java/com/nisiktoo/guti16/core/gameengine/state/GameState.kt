@@ -22,6 +22,7 @@ data class GameState(
     val currentPlayer: Player,
     val gamePhase: GamePhase = GamePhase.NORMAL,
     val selectedPiece: PieceId? = null,
+    val selectedNode: BoardNodeId? = null,
     val capturedCountA: Int = 0,
     val capturedCountB: Int = 0,
     val winner: Player? = null,
@@ -51,4 +52,7 @@ data class GameState(
      * @return The count of alive pieces owned by the specified player.
      */
     fun aliveCountOfPlayer(player: Player): Int = piecesOfPlayer(player).count { it.isAlive }
+
+    fun getPieceOwner(pieceId: PieceId): Player = pieces[pieceId.value].owner
+
 }

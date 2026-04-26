@@ -2,9 +2,6 @@ package com.nisiktoo.guti16.core.gameengine.board
 
 import com.nisiktoo.guti16.core.gameengine.model.BoardNode
 import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
-import java.util.ArrayDeque
-import javax.sound.midi.MidiEvent
-import kotlin.math.abs
 
 /**
  * Public read-only façade over the 16 Guti board graph.
@@ -138,8 +135,8 @@ object BoardGraphApi {
      * @return the matching [BoardNode].
      * @throws IllegalStateException if [id] is not part of the board.
      */
-    fun getNode(id: BoardNodeId): BoardNode =
-        nodes[id] ?: error("Invalid node id: ${id.value}")
+    fun getNode(id: BoardNodeId?): BoardNode =
+        nodes[id] ?: error("Invalid node id: ${id?.value}")
 
     /**
      * Returns the direct neighbors for [id].

@@ -1,6 +1,8 @@
 package com.nisiktoo.guti16.core.gameengine.logic
 
 import com.nisiktoo.guti16.core.gameengine.board.BoardGraphApi
+import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
+import com.nisiktoo.guti16.core.gameengine.model.GamePhase
 import com.nisiktoo.guti16.core.gameengine.model.Move
 import com.nisiktoo.guti16.core.gameengine.model.Piece
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
@@ -45,5 +47,34 @@ object GameEngine {
             pieces.add(Piece(id = PieceId(idCounter++), owner = owner, position = node.id))
         }
         return pieces
+    }
+
+
+    fun selectNode(state: GameState, nodeId: BoardNodeId?): GameState {
+        if (nodeId == null) {
+            /* Deselect */
+            if (state.gamePhase == GamePhase.SELECTED) {
+                return state.copy(
+                    selectedPiece = null,
+                    selectedNode = null,
+                    gamePhase = GamePhase.NORMAL,
+                )
+            }
+            return state
+        }
+
+        /* no node is already selected */
+        if (state.gamePhase == GamePhase.NORMAL) {
+            val pieceId = state.pieceAt(nodeId) ?: return state
+            if (state.currentPlayer != state.getPieceOwner(pieceId)) return state
+            return state.copy(
+                selectedPiece = pieceId,
+                selectedNode = nodeId,
+                gamePhase = GamePhase.SELECTED,
+            )
+        }
+
+
+        return state
     }
 }

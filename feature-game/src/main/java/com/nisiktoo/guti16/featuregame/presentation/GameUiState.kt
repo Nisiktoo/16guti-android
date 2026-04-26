@@ -44,6 +44,7 @@ data class PieceUi(
     val pieceColor: Color,
     val borderColor: Color,
     val selectedGlowColor: Color,
+    val isSelected: Boolean = false,
 )
 
 /**

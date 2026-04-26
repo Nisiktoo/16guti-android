@@ -8,7 +8,7 @@ import com.nisiktoo.guti16.core.gameengine.state.GameState
  */
 data class GameSession(
     val id: String,
-    val gameState: GameState,
+    var gameState: GameState,
     val playerA: PlayerProfile,
     val playerB: PlayerProfile,
     val status: SessionStatus = SessionStatus.ACTIVE,

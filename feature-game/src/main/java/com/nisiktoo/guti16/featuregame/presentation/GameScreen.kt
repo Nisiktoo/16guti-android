@@ -32,7 +32,8 @@ fun GameScreen(modifier: Modifier = Modifier.fillMaxSize()) {
     ){
         BoardCanvas(pieces = uiState.pieces,
             onNodeClick = { nodeId ->
-                viewModel.onEvent(GameEvent.BoardNodeTapped(BoardNodeId(nodeId)))
+                val boardNodeId = nodeId?.let { BoardNodeId(it) }
+                viewModel.onEvent(GameEvent.BoardNodeTapped(boardNodeId))
             },
             modifier = Modifier.fillMaxSize()
         )
