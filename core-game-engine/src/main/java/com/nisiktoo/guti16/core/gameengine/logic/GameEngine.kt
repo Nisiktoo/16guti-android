@@ -8,7 +8,6 @@ import com.nisiktoo.guti16.core.gameengine.model.Piece
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
 import com.nisiktoo.guti16.core.gameengine.model.Player
 import com.nisiktoo.guti16.core.gameengine.state.GameState
-import kotlin.uuid.Uuid.Companion.random
 
 /**
  * Entry point for game state creation and updates.
@@ -32,6 +31,72 @@ object GameEngine {
 
     fun applyMove(state: GameState, move: Move): GameState {
         TODO("Validate the move and return the updated GameState")
+    }
+
+    fun performStepMove(state: GameState, from: BoardNodeId?, to: BoardNodeId?): GameState {
+        if (state.isOccupied(to)) {
+            if (state.getPieceOwner(state.pieceAt(from)!!) == state.currentPlayer) {
+                return state.copy(
+                    selectedNode = to,
+                    selectedPiece = state.pieceAt(to)
+                )
+            }
+            return state
+        }
+        val pieceId = state.pieceAt(from) ?: return state
+        val newOccupancy = state.occupancy.toMutableMap().apply {
+            remove(from)
+            put(to, pieceId)
+        }
+        // Update pieces list
+        val newPieces = state.pieces.map { piece ->
+            when (piece.id) {
+                pieceId -> piece.copy(position = to)
+                else -> piece
+            }
+        }
+        return state.copy(
+            pieces = newPieces,
+            occupancy = newOccupancy,
+            selectedNode = null,
+            selectedPiece = null,
+            gamePhase = GamePhase.NORMAL,
+            currentPlayer = if (state.currentPlayer == Player.A) Player.B else Player.A,
+        )
+    }
+    /**
+     * Executes a capture move and returns the updated GameState.
+     */
+    fun performCapture(state: GameState, from: BoardNodeId, to: BoardNodeId): GameState {
+        val middleNodeId = BoardGraphApi.getCaptureMiddleNodeId(from, to) ?: return state
+        val pieceId = state.pieceAt(from) ?: return state
+        val capturedPieceId = state.pieceAt(middleNodeId) ?: return state
+
+        // Update occupancy map
+        val newOccupancy = state.occupancy.toMutableMap().apply {
+            remove(from)
+            remove(middleNodeId)
+            put(to, pieceId)
+        }
+
+
+        // Update pieces list
+        val newPieces = state.pieces.map { piece ->
+            when (piece.id) {
+                pieceId -> piece.copy(position = to)
+                capturedPieceId -> piece.copy(isAlive = false, position = null)
+                else -> piece
+            }
+        }
+
+        // Return updated state
+        return state.copy(
+            pieces = newPieces,
+            occupancy = newOccupancy,
+            capturedCountA = if (state.currentPlayer == Player.A) state.capturedCountA + 1 else state.capturedCountA,
+            capturedCountB = if (state.currentPlayer == Player.B) state.capturedCountB + 1 else state.capturedCountB,
+            selectedNode = to // Update selected node to the new position for potential chain captures
+        )
     }
 
     /** Creates the initial pieces for both players and places them on the board according to the standard 16 Guti setup. */
@@ -73,8 +138,59 @@ object GameEngine {
                 gamePhase = GamePhase.SELECTED,
             )
         }
+        // current gamePhase is either selected or capture chain
+
+        val targetNodeId = nodeId
+        if (canCapture(state, state.selectedNode!!, targetNodeId)) {
+            val newState = performCapture(state, state.selectedNode, targetNodeId)
+            if (canCaptureAnotherPiece(newState, targetNodeId)) {
+                return newState.copy(
+                    gamePhase = GamePhase.CAPTURE_CHAIN,
+                )
+            } else {
+                return newState.copy(
+                    selectedPiece = null,
+                    selectedNode = null,
+                    gamePhase = GamePhase.NORMAL,
+                    currentPlayer = if (newState.currentPlayer == Player.A) Player.B else Player.A,
+                )
+            }
+        }
+        if (state.gamePhase == GamePhase.SELECTED) {
+            return performStepMove(state, state.selectedNode, targetNodeId)
+        }
 
 
         return state
+    }
+
+    /**
+     * returns true if it is possible to capture by going to destination node from current selected node
+     */
+    fun canCapture(state: GameState, currentNodeId: BoardNodeId, destinationNodeId: BoardNodeId): Boolean {
+        val currentPlayer = state.getPieceOwner(state.selectedPiece!!)
+        // if it is not a valid capture move
+        val middleNodeId = BoardGraphApi.getCaptureMiddleNodeId(currentNodeId, destinationNodeId) ?: return false
+        val middlePieceId = state.pieceAt(middleNodeId) ?: return false
+        return state.getPieceOwner(middlePieceId) != currentPlayer
+    }
+
+    /**
+     * returns true if it is possible to capture another Piece from current selected node
+     */
+    fun canCaptureAnotherPiece(state: GameState, currentNodeId: BoardNodeId): Boolean {
+        val currentPlayer = state.getPieceOwner(state.selectedPiece!!)
+        val destinationNodes = BoardGraphApi.getCaptureNodesOf(currentNodeId)
+        for (destinationNodeId in destinationNodes) {
+            if (state.isOccupied(BoardNodeId(destinationNodeId))) continue;
+            val middleNodeId = BoardGraphApi.getCaptureMiddleNodeId(currentNodeId, BoardNodeId(destinationNodeId))
+            if (state.isOccupied(middleNodeId)) {
+                val middlePieceId = state.pieceAt(middleNodeId) ?: continue
+                if (state.getPieceOwner(middlePieceId) != currentPlayer) {
+                    return true
+                }
+            }
+        }
+        return false;
     }
 }

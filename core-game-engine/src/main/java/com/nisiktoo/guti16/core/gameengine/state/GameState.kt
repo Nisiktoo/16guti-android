@@ -18,7 +18,7 @@ import com.nisiktoo.guti16.core.gameengine.model.PieceId
  */
 data class GameState(
     val pieces: List<Piece>,
-    val occupancy: Map<BoardNodeId?, PieceId>,
+    val occupancy: Map<BoardNodeId?, PieceId?>,
     val currentPlayer: Player,
     val gamePhase: GamePhase = GamePhase.NORMAL,
     val selectedPiece: PieceId? = null,
@@ -31,13 +31,13 @@ data class GameState(
      * @param nodeId The ID of the board node to check for a piece.
      * @return The piece occupying the specified node, or null if the node is unoccupied
      */
-    fun pieceAt(nodeId: BoardNodeId): PieceId? = occupancy[nodeId]
+    fun pieceAt(nodeId: BoardNodeId?): PieceId? = occupancy[nodeId]
 
     /** Checks if the specified board node is currently occupied by a piece.
      * @param nodeId The ID of the board node to check for occupancy.
      * @return True if the node is occupied by a piece, false if it is unoccupied.
      */
-    fun isOccupied(nodeId: BoardNodeId): Boolean = occupancy.containsKey(nodeId)
+    fun isOccupied(nodeId: BoardNodeId?): Boolean = occupancy.containsKey(nodeId) && occupancy[nodeId] != null
 
     /** Retrieves a list of all pieces currently owned by the specified player.
      * @param player The player whose pieces to retrieve.
@@ -53,6 +53,10 @@ data class GameState(
      */
     fun aliveCountOfPlayer(player: Player): Int = piecesOfPlayer(player).count { it.isAlive }
 
+    /** Retrieves the owner of the piece with the specified ID.
+     * @param pieceId The ID of the piece to retrieve the owner for.
+     * @return The player who owns the specified piece.
+     */
     fun getPieceOwner(pieceId: PieceId): Player = pieces[pieceId.value].owner
 
 }

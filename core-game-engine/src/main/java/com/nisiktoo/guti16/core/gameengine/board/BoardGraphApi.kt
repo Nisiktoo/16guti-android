@@ -55,7 +55,9 @@ object BoardGraphApi {
         }
     }
 
-    /** Cached list of valid capture targets for each source node, used for efficient move generation. */
+    /** Cached list of valid capture targets for each source node, used for efficient move generation.
+     * nodeCapturePathsOf(v) = List of all node to which v can go to capture.
+     */
     private val nodeCapturePathsOf: Array<MutableList<Int>> by lazy {
         Array(matrixSize) { mutableListOf() }
     }
@@ -168,7 +170,7 @@ object BoardGraphApi {
      * @return the middle node ID representing the captured piece, or null if no capture is possible.
      * @throws IllegalArgumentException if either [from] or [to] is not a valid node ID.
      */
-    fun getCaptureMiddleNode(from: BoardNodeId, to: BoardNodeId): BoardNodeId? {
+    fun getCaptureMiddleNodeId(from: BoardNodeId, to: BoardNodeId): BoardNodeId? {
         if (!isValidNodeId(from) || !isValidNodeId(to)) {
             throw IllegalArgumentException("Invalid node ID: from=${from.value}, to=${to.value}")
         }
@@ -180,5 +182,9 @@ object BoardGraphApi {
 
     /** Get all the board node ids as a list of Integer. The order of nodes is not guaranteed and should not be relied upon.*/
     fun getAllBoardNodeIds(): List<Int> = nodeIds.toList()
+
+    /** get all the capture nodes of a given node. returns Integer List !! */
+    fun getCaptureNodesOf(from: BoardNodeId) = nodeCapturePathsOf[from.value]
+
 
 }
