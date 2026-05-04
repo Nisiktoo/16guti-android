@@ -5,6 +5,7 @@ import com.nisiktoo.guti16.core.gameengine.model.Piece
 import com.nisiktoo.guti16.core.gameengine.model.Player
 import com.nisiktoo.guti16.core.gameengine.model.GamePhase
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
+import com.nisiktoo.guti16.core.gameengine.model.MoveSound
 
 /**
  * Represents the current state of the game, including the positions of pieces on the board, the current player, and other relevant information.
@@ -26,6 +27,7 @@ data class GameState(
     val capturedCountA: Int = 0,
     val capturedCountB: Int = 0,
     val winner: Player? = null,
+    var lastMoveSound: MoveSound = MoveSound.NONE,
     ) {
     /** Retrieves the piece at the specified board node, or null if the node is unoccupied.
      * @param nodeId The ID of the board node to check for a piece.

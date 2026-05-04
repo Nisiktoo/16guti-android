@@ -8,6 +8,7 @@ import com.nisiktoo.guti16.core.gameengine.model.Piece
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
 import com.nisiktoo.guti16.core.gameengine.model.Player
 import com.nisiktoo.guti16.core.gameengine.state.GameState
+import com.nisiktoo.guti16.core.gameengine.model.MoveSound
 
 /**
  * Entry point for game state creation and updates.
@@ -34,8 +35,10 @@ object GameEngine {
     }
 
     fun performStepMove(state: GameState, from: BoardNodeId?, to: BoardNodeId?): GameState {
+
+        /* select another piece of the current player */
         if (state.isOccupied(to)) {
-            if (state.getPieceOwner(state.pieceAt(from)!!) == state.currentPlayer) {
+            if (state.getPieceOwner(state.pieceAt(to)!!) == state.currentPlayer) {
                 return state.copy(
                     selectedNode = to,
                     selectedPiece = state.pieceAt(to)
@@ -43,6 +46,8 @@ object GameEngine {
             }
             return state
         }
+//        println("Attempting step move from ${from} to $to")
+        if (!BoardGraphApi.isAdjacent(from!!, to!!)) return state
         val pieceId = state.pieceAt(from) ?: return state
         val newOccupancy = state.occupancy.toMutableMap().apply {
             remove(from)
@@ -62,6 +67,7 @@ object GameEngine {
             selectedPiece = null,
             gamePhase = GamePhase.NORMAL,
             currentPlayer = if (state.currentPlayer == Player.A) Player.B else Player.A,
+            lastMoveSound = MoveSound.MOVE,
         )
     }
     /**
@@ -95,7 +101,8 @@ object GameEngine {
             occupancy = newOccupancy,
             capturedCountA = if (state.currentPlayer == Player.A) state.capturedCountA + 1 else state.capturedCountA,
             capturedCountB = if (state.currentPlayer == Player.B) state.capturedCountB + 1 else state.capturedCountB,
-            selectedNode = to // Update selected node to the new position for potential chain captures
+            selectedNode = to, // Update selected node to the new position for potential chain captures
+            lastMoveSound = MoveSound.CAPTURE,
         )
     }
 
@@ -116,33 +123,35 @@ object GameEngine {
 
 
     fun selectNode(state: GameState, nodeId: BoardNodeId?): GameState {
+        val nstate = state.copy(lastMoveSound = MoveSound.NONE)
         if (nodeId == null) {
             /* Deselect */
-            if (state.gamePhase == GamePhase.SELECTED) {
-                return state.copy(
+            if (nstate.gamePhase == GamePhase.SELECTED) {
+                return nstate.copy(
                     selectedPiece = null,
                     selectedNode = null,
                     gamePhase = GamePhase.NORMAL,
                 )
             }
-            return state
+            return nstate
         }
 
         /* no node is already selected */
-        if (state.gamePhase == GamePhase.NORMAL) {
-            val pieceId = state.pieceAt(nodeId) ?: return state
-            if (state.currentPlayer != state.getPieceOwner(pieceId)) return state
-            return state.copy(
+        if (nstate.gamePhase == GamePhase.NORMAL) {
+            val pieceId = nstate.pieceAt(nodeId) ?: return nstate
+            if (nstate.currentPlayer != nstate.getPieceOwner(pieceId)) return nstate
+            return nstate.copy(
                 selectedPiece = pieceId,
                 selectedNode = nodeId,
                 gamePhase = GamePhase.SELECTED,
+                lastMoveSound = MoveSound.NONE,
             )
         }
         // current gamePhase is either selected or capture chain
 
         val targetNodeId = nodeId
-        if (canCapture(state, state.selectedNode!!, targetNodeId)) {
-            val newState = performCapture(state, state.selectedNode, targetNodeId)
+        if (canCapture(nstate, nstate.selectedNode!!, targetNodeId)) {
+            val newState = performCapture(nstate, nstate.selectedNode, targetNodeId)
             if (canCaptureAnotherPiece(newState, targetNodeId)) {
                 return newState.copy(
                     gamePhase = GamePhase.CAPTURE_CHAIN,
@@ -156,12 +165,12 @@ object GameEngine {
                 )
             }
         }
-        if (state.gamePhase == GamePhase.SELECTED) {
-            return performStepMove(state, state.selectedNode, targetNodeId)
+        if (nstate.gamePhase == GamePhase.SELECTED) {
+            return performStepMove(nstate, nstate.selectedNode, targetNodeId)
         }
 
 
-        return state
+        return nstate
     }
 
     /**
@@ -172,6 +181,7 @@ object GameEngine {
         // if it is not a valid capture move
         val middleNodeId = BoardGraphApi.getCaptureMiddleNodeId(currentNodeId, destinationNodeId) ?: return false
         val middlePieceId = state.pieceAt(middleNodeId) ?: return false
+        if (state.isOccupied( destinationNodeId)) return false
         return state.getPieceOwner(middlePieceId) != currentPlayer
     }
 
