@@ -332,18 +332,5 @@ private fun DrawScope.drawPieces(layout: BoardLayout, pieces: List<PieceUi>) {
                     center = center,
                 )
             }
-//            drawCircle(
-//                color = piece.selectedGlowColor.copy(alpha = 0.22f),
-//                radius = pieceRadius * 0.82f,
-//                center = center,
-//            )
-//            drawCircle(
-//                color = piece.borderColor,
-//                radius = pieceRadius,
-//                center = center,
-//                style = androidx.compose.ui.graphics.drawscope.Stroke(
-//                    width = (pieceRadius * 0.12f).coerceAtLeast(1.5f)
-//                ),
-//            )
         }
 }

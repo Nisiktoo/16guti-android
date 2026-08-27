@@ -26,6 +26,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.nisiktoo.guti16.featuregame.presentation.GameScreen
 import com.nisiktoo.guti16.ui.theme._16GutiTheme
 import kotlinx.coroutines.delay
@@ -35,6 +38,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // hide status and nav bars
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
         setContent {
             GameScreen()
         }

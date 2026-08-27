@@ -4,9 +4,7 @@ import com.nisiktoo.guti16.core.gameengine.model.BoardNode
 import com.nisiktoo.guti16.core.gameengine.model.BoardNodeId
 import com.nisiktoo.guti16.core.gameengine.model.GamePhase
 import com.nisiktoo.guti16.core.gameengine.model.PieceId
-import com.nisiktoo.guti16.core.gameengine.state.GameState
 import com.nisiktoo.guti16.core.gameengine.model.Player
-import androidx.compose.ui.graphics.Color
 
 /**
  * Represents the UI state of the game, including the list of pieces, current player, selected piece, game phase, winner, last move, and any error messages.
@@ -23,28 +21,12 @@ data class GameUiState(
     val currentPlayer: Player = Player.A,
     val selectedPieceId: PieceId? = null,
     val selectedNodeID: BoardNodeId? = null,
+    val capturedCountA: Int = 0,
+    val capturedCountB: Int = 0,
     val gamePhase: GamePhase = GamePhase.NORMAL,
     val winner: Player? = null,
     val lastMove: MoveUi? = null,
     val errorMessage: String? = null,
-)
-
-/**
- * Represents the UI state of a piece on the board, including its ID, owner, position, and whether it is alive.
- * @param id The unique identifier of the piece.
- * @param owner The player who owns this piece (A or B).
- * @param position The current position of the piece on the board, represented by a BoardNodeId.
- * @param isAlive Indicates whether the piece is still in play (not captured) or
- */
-data class PieceUi(
-    val id: PieceId,
-    val owner: Player,
-    val position: BoardNodeId?,
-    val isAlive: Boolean = true,
-    val pieceColor: Color,
-    val borderColor: Color,
-    val selectedGlowColor: Color,
-    val isSelected: Boolean = false,
 )
 
 /**
